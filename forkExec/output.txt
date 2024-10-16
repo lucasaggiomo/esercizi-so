@@ -1,0 +1,4 @@
+Inizio esecuzione del processo 8594
+Sono il padre (8594), ed ho fatto un figlio con pid 8595
+Inizio esecuzione del processo 8594
+Sono il figlio (8595)
