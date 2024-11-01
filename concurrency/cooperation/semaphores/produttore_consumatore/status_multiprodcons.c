@@ -9,7 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../../utils/semaphore.h"
+#include "../semaphore.h"
 
 // definizione indici dei semafori nell'array dei semafori condiviso
 #define SPAZIO_DISP 0  // spazio disponibile

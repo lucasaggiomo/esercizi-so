@@ -8,27 +8,50 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../../utils/semaphore.h"
+#include "../semaphore.h"
 
 #define SPAZIO_DISP 0  // spazio disponibile
 #define MSG_DISP 1     // messaggio disponibile
 
-void produttore(int* p_sh, int semid) {
+#define DIM 3
+
+// struct per la coda circolare
+struct queue {
+    int buffer[DIM];
+    int head;
+    int tail;
+};
+
+void enqueue(struct queue* q, int value) {
+    q->buffer[q->head] = value;
+    q->head = (q->head + 1) % DIM;
+}
+int dequeue(struct queue* q) {
+    int output = q->buffer[q->tail];
+    q->tail = (q->tail + 1) % DIM;
+    return output;
+}
+
+void produttore(struct queue* q_sh, int semid) {
     // decrementa il semaforo SPAZIO_DISP e si blocca se il valore diventa negativo
     Wait_Sem(semid, SPAZIO_DISP);
 
-    *p_sh = rand() % 16;
-    printf("Produzione: %d\n", *p_sh);
+    int value = rand() % 16;
+    enqueue(q_sh, value);
+    printf("Produzione: %d\n", value);
 
     // incrementa il semaforo MSG_DISP in modo da svegliare il consumatore in coda
     Signal_Sem(semid, MSG_DISP);
 }
 
-void consumatore(int* p_sh, int semid) {
+void consumatore(struct queue* q_sh, int semid) {
     // decrementa il semaforo MSG_DISP e si blocca se il valore diventa negativo
     Wait_Sem(semid, MSG_DISP);
 
-    printf("Consumatore: %d\n", *p_sh);
+    int value = dequeue(q_sh);
+    printf("Consumatore: %d\n", value);
+
+    sleep(1);
 
     // incrementa il semaforo SPAZIO_DISP in modo da svegliare il produttore in coda
     Signal_Sem(semid, SPAZIO_DISP);
@@ -47,7 +70,7 @@ int main() {
     }
 
     // inizializzo i semafori
-    int result = semctl(semid, SPAZIO_DISP, SETVAL, 1);
+    int result = semctl(semid, SPAZIO_DISP, SETVAL, DIM);  // inizialmente è possibile produrre DIM volte
 
     // gestisco eventuali errori
     if (result < 0) {
@@ -55,7 +78,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    result = semctl(semid, MSG_DISP, SETVAL, 0);
+    result = semctl(semid, MSG_DISP, SETVAL, 0);  // inizialmente non è possibile consumare nulla
 
     // gestisco eventuali errori
     if (result < 0) {
@@ -65,7 +88,7 @@ int main() {
 
     // creo la memoria condivisa
 
-    int ds_shm = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0644);
+    int ds_shm = shmget(IPC_PRIVATE, sizeof(struct queue), IPC_CREAT | 0644);
 
     if (ds_shm < 0) {
         perror("Errore nella creazione della memoria condivisa");
@@ -73,18 +96,22 @@ int main() {
     }
 
     // collego ("attach") il segmento di memoria allo spazio di indirizzamento del chiamante
-    int* p = shmat(ds_shm, NULL, 0);
+    struct queue* q = shmat(ds_shm, NULL, 0);
 
-    if (p == (void*)-1) {
+    if (q == (void*)-1) {
         perror("Errore nel colllegamento della memoria condivisa");
         exit(EXIT_FAILURE);
     }
 
-    // creo il produttore (che scrive su p)
+    // inizializzo head e tail
+    q->head = 0;
+    q->tail = 0;
+
+    // creo il produttore (che scrive su q)
     int pid = fork();
 
     // sia il processo padre sia il figlio ottengono una copia
-    // del puntatore a memoria condivisa "p"
+    // del puntatore a memoria condivisa "q"
 
     if (pid < 0) {
         // errore
@@ -95,7 +122,7 @@ int main() {
         // processo figlio
 
         for (int i = 0; i < 4; i++) {
-            produttore(p, semid);
+            produttore(q, semid);
         }
 
         // termina l'esecuzione
@@ -114,7 +141,7 @@ int main() {
         // processo figlio
 
         for (int i = 0; i < 4; i++) {
-            consumatore(p, semid);
+            consumatore(q, semid);
         }
 
         // termina l'esecuzione

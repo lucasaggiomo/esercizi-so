@@ -8,12 +8,18 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../../utils/semaphore.h"
+#include "../semaphore.h"
 
+// definizione indici dei semafori nell'array dei semafori condiviso
 #define SPAZIO_DISP 0  // spazio disponibile
 #define MSG_DISP 1     // messaggio disponibile
+#define MUTEX_P 2      // gestisce la mutua esclusione dei produttori
+#define MUTEX_C 3      // gestisce la mutua esclusione dei consumatori
 
 #define DIM 3
+
+#define NUM_PRODUTTORI 2
+#define NUM_CONSUMATORI 1
 
 // struct per la coda circolare
 struct queue {
@@ -36,9 +42,17 @@ void produttore(struct queue* q_sh, int semid) {
     // decrementa il semaforo SPAZIO_DISP e si blocca se il valore diventa negativo
     Wait_Sem(semid, SPAZIO_DISP);
 
+    // mutua esclusione tra i produttori per gestire il caso di più produttori (decrementa il semaforo MUTEX_P, se è < 0 si blocca)
+    Wait_Sem(semid, MUTEX_P);
+
     int value = rand() % 16;
+    printf("Produzione:\t%d\t(testa = %d)\n", value, q_sh->head);
+    sleep(1);
+
     enqueue(q_sh, value);
-    printf("Produzione: %d\n", value);
+
+    // termina la mutua esclusione (incrementa il semaforo MUTEX_P, se è <= 0 allora sveglia un altro produttore in attesa)
+    Signal_Sem(semid, MUTEX_P);
 
     // incrementa il semaforo MSG_DISP in modo da svegliare il consumatore in coda
     Signal_Sem(semid, MSG_DISP);
@@ -48,20 +62,63 @@ void consumatore(struct queue* q_sh, int semid) {
     // decrementa il semaforo MSG_DISP e si blocca se il valore diventa negativo
     Wait_Sem(semid, MSG_DISP);
 
-    int value = dequeue(q_sh);
-    printf("Consumatore: %d\n", value);
+    // Mutua esclusione per il consumatore (analogo al produttore)
+    Wait_Sem(semid, MUTEX_C);
 
-    sleep(1);
+    int tail = q_sh->tail;
+    int value = dequeue(q_sh);
+    printf("Consumatore:\t%d\t(coda = %d)\n", value, tail);
+
+    Signal_Sem(semid, MUTEX_C);
 
     // incrementa il semaforo SPAZIO_DISP in modo da svegliare il produttore in coda
     Signal_Sem(semid, SPAZIO_DISP);
 }
 
-int main() {
-    srand(time(NULL));
+void fork_produttore(struct queue* q_sh, int semid, int produzioni) {
+    int pid = fork();
 
-    // creo due semafori (array di 2 semafori)
-    int semid = semget(IPC_PRIVATE, 2, IPC_CREAT | 0644);
+    if (pid < 0) {
+        // errore
+        perror("Errore nella creazione del produttore");
+        exit(EXIT_FAILURE);
+
+    } else if (pid == 0) {
+        srand(getpid());
+        // processo figlio
+
+        for (int i = 0; i < produzioni; i++) {
+            produttore(q_sh, semid);
+        }
+
+        // termina l'esecuzione del produttore
+        exit(EXIT_SUCCESS);
+    }
+}
+
+void fork_consumatore(struct queue* q_sh, int semid, int consumazioni) {
+    int pid = fork();
+
+    if (pid < 0) {
+        // errore
+        perror("Errore nella creazione del consumatore");
+        exit(EXIT_FAILURE);
+
+    } else if (pid == 0) {
+        // processo figlio
+
+        for (int i = 0; i < consumazioni; i++) {
+            consumatore(q_sh, semid);
+        }
+
+        // termina l'esecuzione del consumatore
+        exit(EXIT_SUCCESS);
+    }
+}
+
+int main() {
+    // creo due semafori (array di 4 semafori)
+    int semid = semget(IPC_PRIVATE, 4, IPC_CREAT | 0644);
 
     // gestisco eventuali errori
     if (semid < 0) {
@@ -86,6 +143,22 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    result = semctl(semid, MUTEX_P, SETVAL, 1);
+
+    // gestisco eventuali errori
+    if (result < 0) {
+        perror("Errore nell'inizializzazione del valore del semaforo MUTEX_P");
+        exit(EXIT_FAILURE);
+    }
+
+    result = semctl(semid, MUTEX_C, SETVAL, 1);  // inizialmente non è possibile consumare nulla
+
+    // gestisco eventuali errori
+    if (result < 0) {
+        perror("Errore nell'inizializzazione del valore del semaforo MUTEX_C");
+        exit(EXIT_FAILURE);
+    }
+
     // creo la memoria condivisa
 
     int ds_shm = shmget(IPC_PRIVATE, sizeof(struct queue), IPC_CREAT | 0644);
@@ -107,50 +180,18 @@ int main() {
     q->head = 0;
     q->tail = 0;
 
-    // creo il produttore (che scrive su q)
-    int pid = fork();
-
-    // sia il processo padre sia il figlio ottengono una copia
-    // del puntatore a memoria condivisa "q"
-
-    if (pid < 0) {
-        // errore
-        perror("Errore nella creazione del produttore");
-        exit(EXIT_FAILURE);
-
-    } else if (pid == 0) {
-        // processo figlio
-
-        for (int i = 0; i < 4; i++) {
-            produttore(q, semid);
-        }
-
-        // termina l'esecuzione
-        exit(EXIT_SUCCESS);
+    for (int i = 0; i < NUM_PRODUTTORI; i++) {
+        fork_produttore(q, semid, 4);
     }
 
-    // creo il
-    pid = fork();
-
-    if (pid < 0) {
-        // errore
-        perror("Errore nella creazione del consumatore");
-        exit(EXIT_FAILURE);
-
-    } else if (pid == 0) {
-        // processo figlio
-
-        for (int i = 0; i < 4; i++) {
-            consumatore(q, semid);
-        }
-
-        // termina l'esecuzione
-        exit(EXIT_SUCCESS);
+    for (int i = 0; i < NUM_CONSUMATORI; i++) {
+        fork_consumatore(q, semid, 8);
     }
 
-    // il padre attende la terminazione dei due figli
-    wait(NULL);
-    wait(NULL);
+    // il padre attende la terminazione dei produttori e dei consumatori
+    for (int i = 0; i < NUM_PRODUTTORI + NUM_CONSUMATORI; i++) {
+        wait(NULL);
+    }
 
     // elimino la risorsa dell'array di semafori
     result = semctl(semid, 0, IPC_RMID);

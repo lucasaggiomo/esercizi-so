@@ -8,7 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../../utils/semaphore.h"
+#include "../semaphore.h"
 
 #define SYNC 0     // indice semaforo per la sincronizzazione tra lettori e scrittori
 #define MUTEX_L 1  // indice semaforo per la mutua esclusione della variabile num_lettori per i lettori
