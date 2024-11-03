@@ -1,6 +1,6 @@
 CFLAGS = -g -Wall -Wextra -O3
 LFLAGS = -pthread
-BIN = prodotto_scalare
+BIN = counter
 OBJ = $(BIN).o
 
 all: $(BIN) clean_obj

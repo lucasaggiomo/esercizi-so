@@ -58,6 +58,7 @@ void fill_random_array(int* dest, int size, int max) {
         dest[i] = rand() % max;
     }
 }
+
 int main() {
     srand(getpid());
 
@@ -75,12 +76,19 @@ int main() {
 
     pthread_t ids[NUM_OF_THREADS];
 
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
     for (int i = 0; i < NUM_OF_THREADS; i++) {
         buffers[i].num1 = arr1[i];
         buffers[i].num2 = arr2[i];
 
-        pthread_create(&ids[i], NULL, &func, buffers + i);
+        pthread_create(&ids[i], &attr, &func, buffers + i);
     }
+
+    pthread_attr_destroy(&attr);
+
     long sum = 0;
     for (int i = 0; i < NUM_OF_THREADS; i++) {
         void* exit_value;
