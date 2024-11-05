@@ -5,8 +5,8 @@ OBJ = $(BIN).o
 
 all: $(BIN) clean_obj
 
-%(BIN): %(BIN).o
-	gcc $(LFLAGS) -c $< -o $@
+$(BIN): $(OBJ)
+	gcc $(LFLAGS) $(OBJ) -o $@
 
 %.o: %.c
 	gcc $(CFLAGS) -c $< -o $@
