@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/types.h>
@@ -10,7 +10,7 @@ void Wait_Sem(int semid, int numsem) {
     struct sembuf sem_buf;
 
     sem_buf.sem_num = numsem;
-    sem_buf.sem_op = -1;  // decrementa di -1 il valore del semaforo
+    sem_buf.sem_op = -1; // decrementa di -1 il valore del semaforo
     sem_buf.sem_flg = 0;
 
     int result = semop(semid, &sem_buf, 1);
@@ -25,7 +25,7 @@ void Signal_Sem(int semid, int numsem) {
     struct sembuf sem_buf;
 
     sem_buf.sem_num = numsem;
-    sem_buf.sem_op = 1;  // incrementa di 1 il valore del semaforo
+    sem_buf.sem_op = 1; // incrementa di 1 il valore del semaforo
     sem_buf.sem_flg = 0;
 
     int result = semop(semid, &sem_buf, 1);
