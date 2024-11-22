@@ -1,8 +1,8 @@
-CFLAGS = -g -Wall -Wextra -pthread -O3
+CFLAGS = -g -Wall -Wextra -O3
 
-SOURCE_DIR = ./scrittore_lettore
+SOURCE_DIR = ./produttore_consumatore
 
-BIN = monobuffer_ls_starvation
+BIN = status_linkedlist_multiprodcons
 
 BIN_FULL = $(SOURCE_DIR)/$(BIN)
 
