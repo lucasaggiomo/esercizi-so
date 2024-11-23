@@ -20,7 +20,7 @@ produttore.o: produttore.c
 consumatore.o: consumatore.c
 	gcc $(CFLAGS) -c consumatore.c -o consumatore.o
 
-buffer_circolare.o: buffer_circolare.c buffer_circolare.h semaphore.o
+buffer_circolare.o: buffer_circolare.c buffer_circolare.h semaphore.c semaphore.h
 	gcc $(CFLAGS) -c buffer_circolare.c -o buffer_circolare.o
 
 semaphore.o: semaphore.c semaphore.h
