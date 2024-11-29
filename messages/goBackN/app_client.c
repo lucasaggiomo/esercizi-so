@@ -6,76 +6,62 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "app_msg.h"
-
-static int id_app_dati;
-static int id_app_ack;
+#include "app_client.h"
 
 const char* frase = "GIOVANNI";
 const int lunghezza = 8;
 
-void init() {
-    // alloca una coda per l'invio dei messaggi app al livello trasporto del client
-    key_t key_app_dati = ftok(".", 'c');
-    id_app_dati = msgget(key_app_dati, IPC_CREAT | 0644);
-    if (id_app_dati < 0) {
-        perror("Errore nella msgget dei dati dell'app verso il trasporto del client");
+void send_sincrona(int id_rts_ots, int id_app_dati, struct msg_app* msg) {
+    int ret;
+
+    // send asincrona RTS
+    struct msg_rts_ots rts = {
+        .type = REQUEST_TO_SEND,
+        .id = rand() % 10000
+    };
+    ret = msgsnd(id_rts_ots, &rts, SIZE_MSG_RTS_OTS, 0);
+    if (ret < 0) {
+        perror("[App Client] Errore msgsnd RTS");
+        exit(1);
+    }
+    printf("[App Client] Request to send {%d} inviata\n", rts.id);
+
+    // receive bloccante OTS
+    struct msg_rts_ots ots;
+    ret = msgrcv(id_rts_ots, &ots, SIZE_MSG_RTS_OTS, OK_TO_SEND, 0);
+    if (ret < 0) {
+        perror("[App Client] Errore msgrcv OTS");
         exit(1);
     }
 
-    // alloca una coda per la ricezione del messaggio di ACK finale dal livello trasporto del client
-    key_t key_app_ack = ftok(".", 'C');
-    id_app_ack = msgget(key_app_ack, IPC_CREAT | 0644);
-    if (id_app_ack < 0) {
-        perror("Errore nella msgget dell'ack trasporto-app del client");
+    printf("[App Client] Ok to send {%d} ricevuta\n", ots.id);
+
+    // send asincrona messaggio
+    ret = msgsnd(id_app_dati, msg, SIZE_MSG_APP, 0);
+    if (ret < 0) {
+        perror("[App Client] Errore msgsnd app -> trasporto");
         exit(1);
     }
 
-    // crea il processo del livello trasporto
-    pid_t pid = fork();
-    if (pid < 0) {
-        perror("Errore nella creazione del server trasporto");
-        exit(1);
-    } else if (pid == 0) {
-        execl("./transport_client", "transport_client", NULL);
-        perror("Errore nell'execl trasporto client");
-        exit(1);
-    }
+    printf("[App Client] Messaggio \'%c\' inviato\n", msg->character);
 }
 
-void destroy() {
-    // dealloca le code
-    int ret = msgctl(id_app_dati, IPC_RMID, NULL);
-    if (ret < 0) {
-        perror("Errore nella deallocazione della coda dei dati app-trasporto del server");
-    }
-    ret = msgctl(id_app_ack, IPC_RMID, NULL);
-    if (ret < 0) {
-        perror("Errore nella deallocazione della coda dell'ack trasporto-app del server");
-    }
-}
-
-int main() {
+void app_client(int id_rts_ots, int id_app_dati) {
     printf("[App Client] In esecuzione\n");
 
-    init();
-
     for (int i = 0; i < lunghezza; i++) {
-        // invia i messaggi tramite il livello trasporto
-
-        struct app_msg msg = {
+        // invia i messaggi tramite il livello trasporto in maniera sincrona
+        // ovvero manda una REQUEST TO SEND, poi attende una OK TO SEND
+        // e infine manda il messaggio effettivo
+        struct msg_app msg = {
             .type = 1,
             .character = frase[i]
         };
+        send_sincrona(id_rts_ots, id_app_dati, &msg);
 
-        // invia i messaggi in maniera asincrona tramite il livello trasporto,
-        // che si occuperà di garantirne
-        // send_message
+        sleep(5);
     }
 
-    destroy();
-
+    // termina
     printf("[App Client] Terminazione\n");
-
-    return 0;
 }
