@@ -71,16 +71,27 @@ NEL DETTAGLIO:
 
 - Il processo transport_client crea una window come memoria condivisa tra i thread (ovvero nell'heap) e crea i seguenti thread:
     1) Un thread che attende i messaggi dall'applicazione (inviandogli un'OTS dopo aver ricevuto un RTS, nel caso in cui sia pronto a ricevere,
-       ovvero se la window non è piena).
+       ovvero se la window non è piena). Quindi, alla ricezione del messaggio dell'applicazione, questo viene incapsulato
+       in un messaggio trasporto, a cui è associato un numero di sequenza progressivo, ottenuto in base al numero di messaggi inviati finora.
        Successivamente questo thread inserisce il messaggio app nella window ai thread (agisce quindi da produttore).
-    2) Un thread che preleva messaggi app dalla coda buffer globale 
+    2) Un thread che preleva messaggi app dalla window e li invia al livello trasporto server
+    3) Un thread che si mette in attesa della ricezione dell'ack del pacchetto con numero di sequenza minore che è stato inviato per cui si
+       attende ancora l'ack. Implementa al suo interno la logica dell'algoritmo, per gestire opportunemante i seguenti casi:
+       - l'ack è stato ricevuto prima del timeout e:
+          - l'ack viene scartato se corrisponde ad un messaggio di cui il mittente era già certo che fosse stato ricevuto dal destinatario
+            (che avviene perché l'ack è cumulativo, quindi per esempio può avvenire se è stato ricevuto un ack con numero N e poi un ack con
+            valore M < N)
+       - l'ack non è stato ricevuto prima del timeout, quindi vengono ritrasmessi i pacchetti per cui si attende l'ack
 
 # Note
 Per simulare dei problemi di rete nell'invio di messaggi, c'è una piccola probabilità che i pacchetti
 non vengano mandati a livello trasporto (ma il mittente deve comunque "credere" di averli inviati,
-ad esempio incapsulando l'invio di un pacchetto in una funzione "invia_pacchetto", nel quale c'è
-una probabilità che il pacchetto non viene mandato, senza che il chiamante lo sappia).
-In questo modo è possibile apprezzare il funzionamento dell'algoritmo.
+incapsulando la logica dell'invio di un messaggio o di un ack all'interno di una funzione "send_maybe",
+che ha in ingresso un parametro che indica la probabilità che il pacchetto venga effettivamente inviato).
+Per questioni di debug il mittente scrive opportunamente a video l'esito dell'invio del messaggio (successo o fallimento),
+ma comunque il mittente si comporta in tutti i casi come se il pacchetto fosse giunto a destinazione.
+In questo modo è possibile apprezzare il funzionamento dell'algoritmo, in quanto in caso di perdite di messaggi dati o di ack
+scatta il timeout
 
 Il livello applicativo del server e del client si occupano solo di inviare/ricevere
 messaggi al/dal livello trasporto associato, tramite le apposite code (create dal livello applicativo).
@@ -89,7 +100,7 @@ Quindi il livello applicativo non conosce la logica sottostante.
 La ricezione dei messaggi è realizzata a livello applicativo in maniera astratta,
 usufruendo delle funzioni implementate al livello trasporto, nei file transport_client.c
 e transport_server.c, dove è effettivamente implementato l'algoritmo di Go-Back-N.
-Il livelli inferiori dello stack del modello ISO-OSI (rete e fisico) sono implementati
+I livelli inferiori dello stack del modello ISO-OSI (rete e fisico) sono implementati
 dal sistema operativo tramite l'utilizzo delle code di messaggi UNIX.
 La comunicazione tra livello applicativo e livello trasporto è implementata tramite code
 di messaggi UNIX (che dovrebbero simulare le socket), dove in questo caso non sono presenti
