@@ -9,7 +9,7 @@
 
 int main() {
     key_t key_comandi = ftok(".", 'r');
-    int id_comandi = Msgget(key_comandi, IPC_CREAT |0644);
+    int id_comandi = Msgget(key_comandi, IPC_CREAT | 0644);
 
     pid_t pid;
 
