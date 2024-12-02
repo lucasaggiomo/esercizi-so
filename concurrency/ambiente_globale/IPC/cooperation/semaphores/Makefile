@@ -1,0 +1,28 @@
+CFLAGS = -g -Wall -Wextra -O3
+
+SOURCE_DIR = ./produttore_consumatore
+
+BIN = status_linkedlist_multiprodcons
+
+BIN_FULL = $(SOURCE_DIR)/$(BIN)
+
+OBJ = $(BIN_FULL).o semaphore.o
+
+all: $(BIN_FULL)
+
+$(BIN_FULL): $(OBJ)
+	gcc $(OBJ) -o $(BIN_FULL)
+
+$(BIN_FULL).o: $(BIN_FULL).c
+	gcc $(CFLAGS) -c $< -o $@
+
+semaphore.o: semaphore.c semaphore.h
+	gcc $(CFLAGS) -c $< -o $@
+
+$(SOURCE_DIR)/%.o: $(SOURCE_DIR)/%.c $(SOURCE_DIR)/%.h
+	gcc $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(SOURCE_DIR)/*.o
+	rm -f $(BIN_FULL)
+	rm -f $(UTILS_DIR)/*.o
