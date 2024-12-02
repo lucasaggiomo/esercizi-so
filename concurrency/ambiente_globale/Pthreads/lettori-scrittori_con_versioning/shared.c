@@ -87,7 +87,7 @@ void fine_scrittura(struct shared* sh) {
     if (sh->num_cv_scrittori > 0) {
         pthread_cond_signal(&sh->cv_scrittori);
     } else if (sh->num_cv_lettori > 0) {
-        pthread_cond_signal(&sh->cv_lettori);
+        pthread_cond_broadcast(&sh->cv_lettori);
     }
 
     pthread_mutex_unlock(&sh->mutex);
