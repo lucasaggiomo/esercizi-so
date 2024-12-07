@@ -1,0 +1,17 @@
+Avvio rotazione
+Interruzione rotazione
+Avvio riscaldamento
+Temperatura: 18 °C
+Temperatura: 21 °C
+Temperatura: 24 °C
+Temperatura: 27 °C
+Temperatura: 30 °C
+Temperatura: 33 °C
+Temperatura: 36 °C
+Temperatura: 39 °C
+Temperatura: 42 °C
+Temperatura: 45 °C
+Temperatura: 48 °C
+Temperatura: 51 °C
+Interruzione riscaldamento
+La preparazione è terminata
