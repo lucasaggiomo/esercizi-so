@@ -50,15 +50,16 @@ void iniettore(int id_client, int id_server, float value_corruption_chance, floa
         printf("[Iniettore] Ho ricevuto il messaggio [%s, %ld]\n", msg_from_client.str, msg_from_client.value);
 
         float chance = (float)(rand() % 1000001) / 1000000;     // random float da 0.0f a 1.0f con risoluzione 1e-6
+        printf("[Iniettore] Chance = %.9g\tvalue_corruption_chance = %.9g\tstring_corruption_change = %.9g\n", chance, value_corruption_chance, str_corruption_chance);
         if (chance < value_corruption_chance) {
             printf("[Iniettore] CORROMPO IL NUMERO INTERO AHAHHAHAHHA\n");
             msg_from_client.value += rand();
-        } else if (chance + value_corruption_chance < str_corruption_chance) {
+        } else if (chance - value_corruption_chance < str_corruption_chance) {
             printf("[Iniettore] CORROMPO LA STRINGA AHAHHAHAHHA\n");
-            int rand_index = rand() % DIM_STRING;
+            int rand_index = rand() % msg_from_client.value;
             msg_from_client.str[rand_index] = '\0';
         } else {
-            printf("[Iniettore] Questa volta sono stato buono...\n");
+            printf("[Iniettore] Questa volta sono stato buono [probabilità 1 - %.9g - %.9g = %.9g]\n", value_corruption_chance, str_corruption_chance, 1 - (value_corruption_chance + str_corruption_chance));
         }
 
         struct msg msg_to_server;
