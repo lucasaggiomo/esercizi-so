@@ -6,7 +6,7 @@
 
 #include "buffer_m.h"
 
-void init_buffer(struct buffer_m* b) {
+void init_buffer(struct buffer_stato_m* b) {
     b->num_lettori = 0;
     b->num_scrittori = 0;
     b->num_cv_lettori = 0;
@@ -17,13 +17,13 @@ void init_buffer(struct buffer_m* b) {
     pthread_cond_init(&b->cv_scrittore, NULL);
 }
 
-void destroy_buffer(struct buffer_m* b) {
+void destroy_buffer(struct buffer_stato_m* b) {
     pthread_mutex_destroy(&b->mutex);
     pthread_cond_destroy(&b->cv_lettore);
     pthread_cond_destroy(&b->cv_scrittore);
 }
 
-void aggiorna(struct buffer_m* b, struct item e) {
+void aggiorna(struct buffer_stato_m* b, struct item e) {
     pthread_mutex_lock(&b->mutex);
 
     while (b->num_cv_scrittori > 0 || b->num_lettori > 0) {
@@ -51,7 +51,7 @@ void aggiorna(struct buffer_m* b, struct item e) {
     pthread_mutex_unlock(&b->mutex);
 }
 
-struct item consulta(struct buffer_m* b) {
+struct item consulta(struct buffer_stato_m* b) {
     struct item e;
 
     pthread_mutex_lock(&b->mutex);
