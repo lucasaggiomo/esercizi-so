@@ -171,7 +171,7 @@ void send(int id_dati, float chance_to_send, struct window* w) {
     if (ret) {
         printf("[Trasporto client - sender %d] Messaggio trasporto [%d] \'%c\' inviato con successo!\n", gettid(), w->buffer[index].num_sequence, w->buffer[index].msg.character);
     } else {
-        printf("[Trasporto client - sender %d] Il messaggio trasporto [%d] \'%c\' SI È PERSO!", gettid(), w->buffer[index].num_sequence, w->buffer[index].msg.character);
+        printf("[Trasporto client - sender %d] Il messaggio trasporto [%d] \'%c\' SI È PERSO!\n", gettid(), w->buffer[index].num_sequence, w->buffer[index].msg.character);
     }
 
     // aggiorna lo stato e segnala i ricevitori di ack (per far partire il timer)
@@ -209,56 +209,72 @@ void receive_ack(int id_ack, int id_dati, float chance_to_send, struct window* w
         // simula un timer con il timeout
         printf("[Trasporto client - acker %d] Attendo ack...\n", gettid());
 
-        sleep(TIMEOUT);
-        ret = msgrcv(id_ack, &ack, SIZE_MSG_ACK, 0, IPC_NOWAIT);
+#define RICEVUTO 0
+#define NON_RICEVUTO 1
+
+        int stato_ricezione_ack = NON_RICEVUTO;
+
+        for (int i = 0; i < TIMEOUT; i++) {
+            sleep(1);
+            ret = msgrcv(id_ack, &ack, SIZE_MSG_ACK, 0, IPC_NOWAIT);
+            if (ret >= 0) {
+                stato_ricezione_ack = RICEVUTO;
+                break;
+            } else if (errno == ENOMSG) {
+                stato_ricezione_ack = NON_RICEVUTO;
+            } else {
+                perror("[Trasporto client - acker] Errore nella msgrcv dell'ACK");
+                exit(1);
+            }
+        }
+        // sleep(TIMEOUT);
 
         pthread_mutex_lock(&w->mutex);
 
-        if (ret >= 0) {
-            // Caso 1: ACK ricevuto
-            if (ack.num_ack <= w->send_base) {
-                // ACK già noto, non fa nulla
-                printf("[Trasporto client - acker %d] Ack ricevuto con numero %d, {id = %d} ma send_base = %d, quindi non faccio nulla\n", gettid(), ack.num_ack, ack.id, w->send_base);
-                pthread_mutex_unlock(&w->mutex);
-                continue;
+        switch (stato_ricezione_ack) {
+            case RICEVUTO: {     // Caso 1: ACK ricevuto
+                if (ack.num_ack <= w->send_base) {
+                    // ACK già noto, non fa nulla
+                    printf("[Trasporto client - acker %d] Ack ricevuto con numero %d, {id = %d} ma send_base = %d, quindi non faccio nulla\n", gettid(), ack.num_ack, ack.id, w->send_base);
+                    pthread_mutex_unlock(&w->mutex);
+                    continue;
+                }
+
+                printf("[Trasporto client - acker %d] Ack ricevuto con numero %d {id = %d} e send_base = %d, quindi aggiorno la window\n", gettid(), ack.num_ack, ack.id, w->send_base);
+
+                // ACK cumulativo, libera tutti i pacchetti fino a ack.num_ack - 1
+                for (int i = w->send_base; i < ack.num_ack; i++) {
+                    int idx = i % WINDOW_SIZE;
+                    w->status[idx] = FREE;
+                    w->num_free++;
+                    pthread_cond_signal(&w->cv_producer);     // segnala che c'è spazio per produrre nuovi pacchetti nella window
+                }
+
+                // aggiorna il send_base e il numero di waiting for ack
+                w->send_base = ack.num_ack;
+                w->num_waiting_for_ack -= (ack.num_ack - oldest_num_seq);
             }
-
-            printf("[Trasporto client - acker %d] Ack ricevuto con numero %d {id = %d} e send_base = %d, quindi aggiorno la window\n", gettid(), ack.num_ack, ack.id, w->send_base);
-
-            // ACK cumulativo, libera tutti i pacchetti fino a ack.num_ack - 1
-            for (int i = w->send_base; i < ack.num_ack; i++) {
-                int idx = i % WINDOW_SIZE;
-                w->status[idx] = FREE;
-                w->num_free++;
-                pthread_cond_signal(&w->cv_producer);     // segnala che c'è spazio per produrre nuovi pacchetti nella window
-            }
-
-            // aggiorna il send_base e il numero di waiting for ack
-            w->send_base = ack.num_ack;
-            w->num_waiting_for_ack -= (ack.num_ack - oldest_num_seq);
-
             // se ci sono altri pacchetti in attesa di ACK, il ciclo riparte e il "timer" continua
+            break;
 
-        } else if (errno == ENOMSG) {
-            printf("[Trasporto client - acker %d] !!TIMEOUT!! Ack non ricevuto, quindi rimando i pacchetti WAITING_FOR_ACK\n", gettid());
+            case NON_RICEVUTO: {
+                printf("[Trasporto client - acker %d] !!TIMEOUT!! Ack non ricevuto, quindi rimando i pacchetti WAITING_FOR_ACK\n", gettid());
 
-            // Caso 2: ACK non ricevuto, timeout, quindi ritrasmetto tutti i pacchetti da send_base a next_seq_num - 1
-            // nota: si potrebbe segnalare i sender, in modo da farlo in concorrenza, ma la logica si complicherebbe
-            for (int i = w->send_base; i < w->next_seq_num; i++) {
-                int idx = i % WINDOW_SIZE;
-                if (w->status[idx] == WAITING_FOR_ACK) {
-                    // invia il pacchetto
-                    ret = send_maybe(id_dati, &w->buffer[idx], SIZE_MSG_DATI, 0, chance_to_send);
-                    if (ret) {
-                        printf("[Trasporto client - acker %d] Messaggio trasporto [%d] \'%c\' ritrasmesso con successo!\n", gettid(), w->buffer[idx].num_sequence, w->buffer[idx].msg.character);
-                    } else {
-                        printf("[Trasporto client - acker %d] Il messaggio trasporto [%d] \'%c\' ritrasmesso SI È PERSO!", gettid(), w->buffer[idx].num_sequence, w->buffer[idx].msg.character);
+                // Caso 2: ACK non ricevuto, timeout, quindi ritrasmetto tutti i pacchetti da send_base a next_seq_num - 1
+                // nota: si potrebbe segnalare i sender, in modo da farlo in concorrenza, ma la logica si complicherebbe
+                for (int i = w->send_base; i < w->next_seq_num; i++) {
+                    int idx = i % WINDOW_SIZE;
+                    if (w->status[idx] == WAITING_FOR_ACK) {
+                        // invia il pacchetto
+                        ret = send_maybe(id_dati, &w->buffer[idx], SIZE_MSG_DATI, 0, chance_to_send);
+                        if (ret) {
+                            printf("[Trasporto client - acker %d] Messaggio trasporto [%d] \'%c\' ritrasmesso con successo!\n", gettid(), w->buffer[idx].num_sequence, w->buffer[idx].msg.character);
+                        } else {
+                            printf("[Trasporto client - acker %d] Il messaggio trasporto [%d] \'%c\' ritrasmesso SI È PERSO!\n", gettid(), w->buffer[idx].num_sequence, w->buffer[idx].msg.character);
+                        }
                     }
                 }
-            }
-        } else {
-            perror("[Trasporto client - acker] Errore nella msgrcv dell'ACK");
-            exit(1);
+            } break;
         }
 
         read_window(w);
