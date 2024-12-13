@@ -30,7 +30,7 @@ server.o: $(SERVER)
 	gcc $(CFLAGS) -c $< -o $@
 
 clean: clean_obj
-	rm -f ./master ./client ./server
+	rm -f ./master ./client ./server ./output.txt
 
 clean_obj:
 	rm -f *.o

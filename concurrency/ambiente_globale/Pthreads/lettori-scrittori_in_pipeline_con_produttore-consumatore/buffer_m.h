@@ -4,7 +4,7 @@
 #include "item.h"
 #include <pthread.h>
 
-struct buffer_m {
+struct buffer_stato_m {
     struct item buffer;
     int num_lettori;
     int num_scrittori;
@@ -16,10 +16,10 @@ struct buffer_m {
     pthread_cond_t cv_scrittore;
 };
 
-void init_buffer(struct buffer_m* b);
-void destroy_buffer(struct buffer_m* b);
+void init_buffer(struct buffer_stato_m* b);
+void destroy_buffer(struct buffer_stato_m* b);
 
-void aggiorna(struct buffer_m* b, struct item e);
-struct item consulta(struct buffer_m* b);
+void aggiorna(struct buffer_stato_m* b, struct item e);
+struct item consulta(struct buffer_stato_m* b);
 
 #endif

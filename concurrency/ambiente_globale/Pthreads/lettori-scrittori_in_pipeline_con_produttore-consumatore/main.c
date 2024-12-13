@@ -36,7 +36,7 @@ int main() {
     struct vettore_m* v = Malloc(sizeof(struct vettore_m));
     init_vettore(v, DIM_BUFFER);
 
-    struct buffer_m* b = Malloc(sizeof(struct buffer_m));
+    struct buffer_stato_m* b = Malloc(sizeof(struct buffer_stato_m));
     init_buffer(b);
 
     void** v_and_b = Malloc(2 * sizeof(void*));
@@ -88,7 +88,7 @@ void* generatore(void* arg) {
 
 void* aggiornatore(void* arg) {
     struct vettore_m* v = ((void**)arg)[0];
-    struct buffer_m* b = ((void**)arg)[1];
+    struct buffer_stato_m* b = ((void**)arg)[1];
 
     for (int i = 0; i < NUM_GENERAZIONI; i++) {
         struct item e = preleva(v);
@@ -106,7 +106,7 @@ void* aggiornatore(void* arg) {
 }
 
 void* destinatario(void* arg) {
-    struct buffer_m* b = arg;
+    struct buffer_stato_m* b = arg;
 
     srand(gettid());
 
