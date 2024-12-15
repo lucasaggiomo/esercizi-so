@@ -8,24 +8,24 @@ typedef unsigned long int size_t;
 typedef struct {
 } Monitor;
 
-extern void enter_monitor(Monitor *m);
-extern void wait_cond(Monitor *m, int var_cond);
-extern void signal_cond(Monitor *m, int var_cond);
-extern int queue_cond(Monitor *m, int var_cond);
-extern void signal_all_cond(Monitor *m, int var_cond);
-extern void leave_monitor(Monitor *m);
+extern void enter_monitor(Monitor* m);
+extern void wait_cond(Monitor* m, int var_cond);
+extern void signal_cond(Monitor* m, int var_cond);
+extern int queue_cond(Monitor* m, int var_cond);
+extern void signal_all_cond(Monitor* m, int var_cond);
+extern void leave_monitor(Monitor* m);
 
 #pragma region STARVATION SOLI SCRITTORI
 // Semafori
 struct buffer_s {
-    void *data;
+    void* data;
     int num_lettori;
 };
 
 #define MUTEX_L 0
 #define SYNCH 1
 
-void leggi_s(int id_sem, struct buffer_s *b, void *data, size_t size) {
+void leggi_s(int id_sem, struct buffer_s* b, void* data, size_t size) {
     Wait_Sem(id_sem, MUTEX_L);
     b->num_lettori++;
     if (b->num_lettori == 1) {
@@ -43,7 +43,7 @@ void leggi_s(int id_sem, struct buffer_s *b, void *data, size_t size) {
     Signal_Sem(id_sem, MUTEX_L);
 }
 
-void scrivi_s(int id_sem, struct buffer_s *b, void *data, size_t size) {
+void scrivi_s(int id_sem, struct buffer_s* b, void* data, size_t size) {
     Wait_Sem(id_sem, SYNCH);
 
     memcpy(b->data, data, size);
@@ -53,7 +53,7 @@ void scrivi_s(int id_sem, struct buffer_s *b, void *data, size_t size) {
 
 // Monitor signal and wait/continue
 struct buffer_smw {
-    void *data;
+    void* data;
     int num_lettori;
 
     Monitor m;
@@ -61,7 +61,7 @@ struct buffer_smw {
 
 #define CV_SCRITTORI 0
 
-void leggi_smw(int id_sem, struct buffer_smw *b, void *data, size_t size) {
+void leggi_smw(int id_sem, struct buffer_smw* b, void* data, size_t size) {
     enter_monitor(&b->m);
 
     b->num_lettori++;
@@ -77,7 +77,7 @@ void leggi_smw(int id_sem, struct buffer_smw *b, void *data, size_t size) {
     leave_monitor(&b->m);
 }
 
-void scrivi_smw(int id_sem, struct buffer_smw *b, void *data, size_t size) {
+void scrivi_smw(int id_sem, struct buffer_smw* b, void* data, size_t size) {
     enter_monitor(&b->m);
 
     if (b->num_lettori > 0) {
@@ -94,7 +94,7 @@ void scrivi_smw(int id_sem, struct buffer_smw *b, void *data, size_t size) {
 // Semafori
 
 struct buffer_ls {
-    void *data;
+    void* data;
     int num_lettori;
     int num_scrittori;
 };
@@ -104,7 +104,7 @@ struct buffer_ls {
 #define MUTEX_RISORSA 2
 #define SYNCH 1
 
-void leggi_ls(int id_sem, struct buffer_ls *b, void *data, size_t size) {
+void leggi_ls(int id_sem, struct buffer_ls* b, void* data, size_t size) {
     Wait_Sem(id_sem, MUTEX_L);
     b->num_lettori++;
     if (b->num_lettori == 1) {
@@ -122,7 +122,7 @@ void leggi_ls(int id_sem, struct buffer_ls *b, void *data, size_t size) {
     Signal_Sem(id_sem, MUTEX_L);
 }
 
-void scrivi_ls(int id_sem, struct buffer_ls *b, void *data, size_t size) {
+void scrivi_ls(int id_sem, struct buffer_ls* b, void* data, size_t size) {
     Wait_Sem(id_sem, MUTEX_S);
     b->num_scrittori++;
     if (b->num_scrittori == 1) {
@@ -146,7 +146,7 @@ void scrivi_ls(int id_sem, struct buffer_ls *b, void *data, size_t size) {
 
 // Monitor signal and wait
 struct buffer_lsmw {
-    void *data;
+    void* data;
     int num_lettori;
     int num_scrittori;
 
@@ -156,7 +156,7 @@ struct buffer_lsmw {
 #define CV_LETTORI 0
 #define CV_SCRITTORI 1
 
-void leggi_lsmw(int id_sem, struct buffer_lsmw *b, void *data, size_t size) {
+void leggi_lsmw(int id_sem, struct buffer_lsmw* b, void* data, size_t size) {
     enter_monitor(&b->m);
 
     if (b->num_scrittori > 0) {
@@ -180,7 +180,7 @@ void leggi_lsmw(int id_sem, struct buffer_lsmw *b, void *data, size_t size) {
     leave_monitor(&b->m);
 }
 
-void scrivi_lsmw(int id_sem, struct buffer_lsmw *b, void *data, size_t size) {
+void scrivi_lsmw(int id_sem, struct buffer_lsmw* b, void* data, size_t size) {
     enter_monitor(&b->m);
 
     if (b->num_scrittori > 0 || b->num_lettori > 0) {
@@ -197,7 +197,7 @@ void scrivi_lsmw(int id_sem, struct buffer_lsmw *b, void *data, size_t size) {
     b->num_scrittori--;
     if (queue_cond(&b->m, CV_SCRITTORI)) {
         signal_cond(&b->m, CV_SCRITTORI);
-    } else if (queue_cond(&b->m, CV_LETTORI)) { // condizione superflua
+    } else if (queue_cond(&b->m, CV_LETTORI)) {     // condizione superflua
         signal_cond(&b->m, CV_LETTORI);
     }
 
@@ -210,7 +210,7 @@ void scrivi_lsmw(int id_sem, struct buffer_lsmw *b, void *data, size_t size) {
 // teoricamente si potrebbe usare comunuque l'algoritmo in precedenza anche in
 // caso di semantica signal and continue
 struct buffer_lsmc {
-    void *data;
+    void* data;
     int num_lettori;
     int num_scrittori;
 
@@ -220,7 +220,7 @@ struct buffer_lsmc {
 #define CV_LETTORI 0
 #define CV_SCRITTORI 1
 
-void leggi_lsmc(int id_sem, struct buffer_lsmc *b, void *data, size_t size) {
+void leggi_lsmc(int id_sem, struct buffer_lsmc* b, void* data, size_t size) {
     enter_monitor(&b->m);
 
     if (b->num_scrittori > 0) {
@@ -242,7 +242,7 @@ void leggi_lsmc(int id_sem, struct buffer_lsmc *b, void *data, size_t size) {
     leave_monitor(&b->m);
 }
 
-void scrivi_lsmc(int id_sem, struct buffer_lsmc *b, void *data, size_t size) {
+void scrivi_lsmc(int id_sem, struct buffer_lsmc* b, void* data, size_t size) {
     enter_monitor(&b->m);
 
     if (b->num_scrittori > 0 || b->num_lettori > 0) {
@@ -259,7 +259,7 @@ void scrivi_lsmc(int id_sem, struct buffer_lsmc *b, void *data, size_t size) {
     b->num_scrittori--;
     if (queue_cond(&b->m, CV_SCRITTORI)) {
         signal_cond(&b->m, CV_SCRITTORI);
-    } else if (queue_cond(&b->m, CV_LETTORI)) { // condizione superflua
+    } else if (queue_cond(&b->m, CV_LETTORI)) {     // condizione superflua
         signal_all_cond(&b->m, CV_LETTORI);
     }
 
