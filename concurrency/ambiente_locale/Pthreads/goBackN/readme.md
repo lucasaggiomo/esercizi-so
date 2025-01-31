@@ -4,6 +4,9 @@ Per semplificare, il mittente è assimilato ad un client, che può solo inviare
 dati e ricevere ACK dal ricevitore, mentre il ricevitore è implementato come
 un server, che può solo ricevere dati e inviare ACK al mittente.
 
+# Compilazione
+Compilare con make ed eseguire ./master
+
 # Master
 Il processo master deve generare due processi figli (due eseguibili differenti dal master):
 - un processo per il client (client.c);
