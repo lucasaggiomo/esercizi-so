@@ -5,7 +5,7 @@ dati e ricevere ACK dal ricevitore, mentre il ricevitore è implementato come
 un server, che può solo ricevere dati e inviare ACK al mittente.
 
 # Compilazione
-Compilare con make ed eseguire ./master
+Compilare con make ed eseguire ./master, oppure eseguire direttamente lo script start.sh
 
 # Master
 Il processo master deve generare due processi figli (due eseguibili differenti dal master):
